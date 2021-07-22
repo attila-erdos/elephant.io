@@ -31,7 +31,7 @@ issue #135 !
 
 Installation
 ============
-We are suggesting you to use composer, with the following : `php composer.phar require wisembly/elephant.io`. For other ways, you can check the release page, or the git clone urls.
+We are suggesting you to use composer, with the following : `composer require attila-erdos/elephant.io`. For other ways, you can check the release page, or the git clone urls.
 
 Documentation
 =============
