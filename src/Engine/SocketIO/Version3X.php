@@ -169,10 +169,12 @@ class Version3X extends Version2X
     public function fwrite_stream($codeWithMessage, $args)
     {
 
-        $chunkSize = 100000;
+        $chunkSize = 500000;
 
         $strings = str_split($args['args']['content'], $chunkSize);
         $count = 0;
+
+        $args['args']['content'] = $strings[$count];
 
         $payload = new Encoder($codeWithMessage . json_encode(
             [
@@ -183,10 +185,8 @@ class Version3X extends Version2X
         ), Encoder::OPCODE_TEXT, true);
 
         fwrite($this->stream, (string)$payload);
-        $this->read();
 
         $count++;
-
         while (isset($strings[$count])) {
             $payload = new Encoder($codeWithMessage . json_encode(
                 [
@@ -199,7 +199,6 @@ class Version3X extends Version2X
             ), Encoder::OPCODE_TEXT, true);
 
             fwrite($this->stream, (string)$payload);
-            $this->read();
             $count++;
         }
 
