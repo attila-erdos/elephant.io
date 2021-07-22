@@ -3,10 +3,10 @@ Forkd from [https://github.com/Wisembly/elephant.io](https://github.com/Wisembly
 
 Elephant.io
 ===========
-[![Build Status](https://travis-ci.org/Wisembly/elephant.io.svg?branch=master)](https://travis-ci.org/Wisembly/elephant.io)
-[![Latest Stable Version](https://poser.pugx.org/wisembly/elephant.io/v/stable.svg)](https://packagist.org/packages/wisembly/elephant.io)
-[![Total Downloads](https://poser.pugx.org/wisembly/elephant.io/downloads.svg)](https://packagist.org/packages/wisembly/elephant.io) 
-[![License](https://poser.pugx.org/wisembly/elephant.io/license.svg)](https://packagist.org/packages/wisembly/elephant.io)
+[![Latest Stable Version](http://poser.pugx.org/attila-erdos/elephant.io/v)](https://packagist.org/packages/attila-erdos/elephant.io) 
+[![Total Downloads](http://poser.pugx.org/attila-erdos/elephant.io/downloads)](https://packagist.org/packages/attila-erdos/elephant.io)
+[![Latest Unstable Version](http://poser.pugx.org/attila-erdos/elephant.io/v/unstable)](https://packagist.org/packages/attila-erdos/elephant.io)
+[![License](http://poser.pugx.org/attila-erdos/elephant.io/license)](https://packagist.org/packages/attila-erdos/elephant.io)
 
 ```
         ___     _,.--.,_         Elephant.io is a rough websocket client
