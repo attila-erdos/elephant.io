@@ -53,10 +53,6 @@ class Version3X extends Version2X
             'transport' => static::TRANSPORT_WEBSOCKET
         ];
 
-        if ($this->options['version'] === 2) {
-            $query['use_b64'] = $this->options['use_b64'];
-        }
-
         $url = sprintf('/%s/?%s', trim($this->url['path'], '/'), http_build_query($query));
 
         $hash = sha1(uniqid(mt_rand(), true), true);
