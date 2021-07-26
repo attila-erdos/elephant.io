@@ -94,11 +94,6 @@ class Version3X extends Version2X
         $request .= "\r\n";
 
         fwrite($this->stream, $request);
-        $result = fread($this->stream, 12);
-
-        if ('HTTP/1.1 101' !== $result) {
-            throw new UnexpectedValueException(sprintf('The server returned an unexpected value. Expected "HTTP/1.1 101", had "%s"', $result));
-        }
 
         // cleaning up the stream
         while ('' !== trim(fgets($this->stream)));
@@ -170,11 +165,21 @@ class Version3X extends Version2X
     {
 
         $chunkSize = 500000;
+        $isLastChunk = false;
 
         $strings = str_split($args['args']['content'], $chunkSize);
         $count = 0;
 
         $args['args']['content'] = $strings[$count];
+
+        if (!isset($strings[$count + 1])) {
+            $args['args']['isLastChunk'] = true;
+        }
+
+        if (isset($args['args']['isLastFile'])) {
+            $isLastFile = true;
+            unset($args['args']['isLastFile']);
+        }
 
         $payload = new Encoder($codeWithMessage . json_encode(
             [
@@ -188,17 +193,31 @@ class Version3X extends Version2X
 
         $count++;
         while (isset($strings[$count])) {
+            if (!isset($strings[$count + 1])) {
+                $isLastChunk = true;
+            }
+
+            $fileInfos = [
+                'content' => $strings[$count],
+                'file' => $args['args']['file']
+            ];
+
+            if ($isLastChunk) {
+                $fileInfos['isLastChunk'] = $isLastChunk;
+                if (isset($isLastFile)) {
+                    $fileInfos['isLastFile'] = $isLastFile;
+                }
+            }
+
             $payload = new Encoder($codeWithMessage . json_encode(
                 [
-                    $args['event'], [
-                        'content' => $strings[$count],
-                        'file' => $args['args']['file']
-                    ]
-
+                    $args['event'],
+                    $fileInfos
                 ]
             ), Encoder::OPCODE_TEXT, true);
 
             fwrite($this->stream, (string)$payload);
+
             $count++;
         }
 
