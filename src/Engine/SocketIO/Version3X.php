@@ -173,7 +173,7 @@ class Version3X extends Version2X
         }
 
         if (isset($args['args']['isLastFile'])) {
-            $isLastFile = true;
+            $isLastFile = $args['args']['isLastFile'];
             if (sizeof($strings) > 1) {
                 unset($args['args']['isLastFile']);
             }
