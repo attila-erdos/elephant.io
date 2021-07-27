@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the Elephant.io package
  *
@@ -144,7 +145,7 @@ abstract class AbstractSocketIO implements EngineInterface
         $data = $this->readBytes(2);
         $bytes = \unpack('C*', $data);
 
-        if (empty($bytes[2])){
+        if (empty($bytes[2])) {
             return;
         }
 
@@ -164,7 +165,7 @@ abstract class AbstractSocketIO implements EngineInterface
          */
         switch ($length) {
             case 0x7D: // 125
-            break;
+                break;
 
             case 0x7E: // 126
                 $data .= $bytes = $this->readBytes(2);
@@ -175,7 +176,7 @@ abstract class AbstractSocketIO implements EngineInterface
                 }
 
                 $length = $bytes[1];
-            break;
+                break;
 
             case 0x7F: // 127
                 // are (at least) 64 bits not supported by the architecture ?
@@ -192,7 +193,7 @@ abstract class AbstractSocketIO implements EngineInterface
                 $data .= $bytes = $this->readBytes(8);
                 list($left, $right) = \array_values(\unpack('N2', $bytes));
                 $length = $left << 32 | $right;
-            break;
+                break;
         }
 
         // incorporate the mask key if the mask bit is 1
@@ -227,16 +228,17 @@ abstract class AbstractSocketIO implements EngineInterface
             throw new MalformedUrlException($url);
         }
 
-        $server = \array_replace(['scheme' => 'http',
-                                 'host'   => 'localhost',
-                                 'query'  => []
-                                ], $parsed);
+        $server = \array_replace([
+            'scheme' => 'http',
+            'host'   => 'localhost',
+            'query'  => []
+        ], $parsed);
 
         if (!isset($server['port'])) {
             $server['port'] = 'https' === $server['scheme'] ? 443 : 80;
         }
 
-        if (!isset($server['path']) || $server['path']=='/') {
+        if (!isset($server['path']) || $server['path'] == '/') {
             $server['path'] = 'socket.io';
         }
 
@@ -262,5 +264,94 @@ abstract class AbstractSocketIO implements EngineInterface
             'wait' => 0,
             'timeout' => \ini_get("default_socket_timeout")
         ];
+    }
+
+    /**
+     * {@inheritDoc}
+     *
+     * Be careful, this method may hang your script, as we're not in a non
+     * blocking mode.
+     */
+    public function readWhile()
+    {
+        $messages = [];
+        while (true) {
+            if (!\is_resource($this->stream)) {
+                break;
+            }
+
+            $this->keepAlive();
+            /*
+         * The first byte contains the FIN bit, the reserved bits, and the
+         * opcode... We're not interested in them. Yet.
+         * the second byte contains the mask bit and the payload's length
+         */
+            $data = $this->readBytes(2);
+            $bytes = \unpack('C*', $data);
+
+            if (empty($bytes[2])) {
+                break;
+            }
+
+            $mask = ($bytes[2] & 0b10000000) >> 7;
+            $length = $bytes[2] & 0b01111111;
+
+            /*
+         * Here is where it is getting tricky :
+         *
+         * - If the length <= 125, then we do not need to do anything ;
+         * - if the length is 126, it means that it is coded over the next 2 bytes ;
+         * - if the length is 127, it means that it is coded over the next 8 bytes.
+         *
+         * But, here's the trick : we cannot interpret a length over 127 if the
+         * system does not support 64bits integers (such as Windows, or 32bits
+         * processors architectures).
+         */
+            switch ($length) {
+                case 0x7D: // 125
+                    break;
+
+                case 0x7E: // 126
+                    $data .= $bytes = $this->readBytes(2);
+                    $bytes = \unpack('n', $bytes);
+
+                    if (empty($bytes[1])) {
+                        throw new RuntimeException('Invalid extended packet len');
+                    }
+
+                    $length = $bytes[1];
+                    break;
+
+                case 0x7F: // 127
+                    // are (at least) 64 bits not supported by the architecture ?
+                    if (8 > PHP_INT_SIZE) {
+                        throw new DomainException('64 bits unsigned integer are not supported on this architecture');
+                    }
+
+                    /*
+                 * As (un)pack does not support unpacking 64bits unsigned
+                 * integer, we need to split the data
+                 *
+                 * {@link http://stackoverflow.com/questions/14405751/pack-and-unpack-64-bit-integer}
+                 */
+                    $data .= $bytes = $this->readBytes(8);
+                    list($left, $right) = \array_values(\unpack('N2', $bytes));
+                    $length = $left << 32 | $right;
+                    break;
+            }
+
+            // incorporate the mask key if the mask bit is 1
+            if (true === $mask) {
+                $data .= $this->readBytes(4);
+            }
+
+            $data .= $this->readBytes($length);
+
+            // decode the payload
+            $decoded_data = (new Decoder($data))->__toString();
+            $messages[] = $decoded_data;
+        }
+
+        return $messages;
     }
 }
