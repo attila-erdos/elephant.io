@@ -174,7 +174,9 @@ class Version3X extends Version2X
 
         if (isset($args['args']['isLastFile'])) {
             $isLastFile = true;
-            unset($args['args']['isLastFile']);
+            if (sizeof($strings) > 1) {
+                unset($args['args']['isLastFile']);
+            }
         }
 
         $payload = new Encoder($codeWithMessage . json_encode(
