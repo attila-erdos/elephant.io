@@ -66,6 +66,14 @@ abstract class AbstractSocketIO implements EngineInterface
         $this->options = \array_replace($this->getDefaultOptions(), $options);
     }
 
+    /**
+     * stream getter
+     * @return resource
+     */
+    public function getStream(){
+        return $this->stream;
+    }
+
     /** {@inheritDoc} */
     public function connect()
     {

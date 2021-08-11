@@ -172,13 +172,6 @@ class Version3X extends Version2X
             $args['args']['isLastChunk'] = true;
         }
 
-        if (isset($args['args']['isLastFile'])) {
-            $isLastFile = $args['args']['isLastFile'];
-            if (sizeof($strings) > 1) {
-                unset($args['args']['isLastFile']);
-            }
-        }
-
         $payload = new Encoder($codeWithMessage . json_encode(
             [
                 $args['event'],
@@ -202,9 +195,6 @@ class Version3X extends Version2X
 
             if ($isLastChunk) {
                 $fileInfos['isLastChunk'] = $isLastChunk;
-                if (isset($isLastFile)) {
-                    $fileInfos['isLastFile'] = $isLastFile;
-                }
             }
 
             $payload = new Encoder($codeWithMessage . json_encode(
