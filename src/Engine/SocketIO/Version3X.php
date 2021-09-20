@@ -64,6 +64,7 @@ class Version3X extends Version2X
         $key = base64_encode($hash);
 
         $origin = '*';
+        $auth = null;
         $headers = isset($this->context['headers']) ? (array) $this->context['headers'] : [];
 
         foreach ($headers as $header) {
@@ -72,6 +73,9 @@ class Version3X extends Version2X
             if (preg_match('`^Origin:\s*(.+?)$`', $header, $matches)) {
                 $origin = $matches[1];
                 break;
+            }
+            if (strpos($header, 'Authorization: Bearer') !== false) {
+                $auth = $header;
             }
         }
 
@@ -83,6 +87,10 @@ class Version3X extends Version2X
             . "Sec-WebSocket-Version: 13\r\n"
             . "Origin: {$origin}\r\n";
 
+        if ($auth) {
+            $request .= $auth . "\r\n";
+        }
+
         if (!empty($this->cookies)) {
             $request .= "Cookie: " . implode('; ', $this->cookies) . "\r\n";
         }
@@ -90,7 +98,6 @@ class Version3X extends Version2X
         $request .= "\r\n";
 
         fwrite($this->stream, $request);
-
         // cleaning up the stream
         while ('' !== trim(fgets($this->stream)));
 
