@@ -63,14 +63,15 @@ abstract class AbstractSocketIO implements EngineInterface
             unset($options['context']);
         }
 
-        $this->options = \array_replace($this->getDefaultOptions(), $options);
+        $this->options = array_replace($this->getDefaultOptions(), $options);
     }
 
     /**
      * stream getter
      * @return resource
      */
-    public function getStream(){
+    public function getStream()
+    {
         return $this->stream;
     }
 
@@ -83,6 +84,7 @@ abstract class AbstractSocketIO implements EngineInterface
     /** {@inheritDoc} */
     public function keepAlive()
     {
+        throw new UnsupportedActionException($this, 'keepAlive');
     }
 
     /** {@inheritDoc} */
@@ -112,27 +114,6 @@ abstract class AbstractSocketIO implements EngineInterface
     }
 
     /**
-     * Network safe \fread wrapper
-     *
-     * @param integer $bytes
-     * @return bool|string
-     */
-    protected function readBytes($bytes)
-    {
-        $data = '';
-        $chunk = null;
-        while ($bytes > 0 && false !== ($chunk = \fread($this->stream, $bytes))) {
-            $bytes -= \strlen($chunk);
-            $data .= $chunk;
-        }
-
-        if (false === $chunk) {
-            throw new RuntimeException('Could not read from stream');
-        }
-        return $data;
-    }
-
-    /**
      * {@inheritDoc}
      *
      * Be careful, this method may hang your script, as we're not in a non
@@ -140,22 +121,17 @@ abstract class AbstractSocketIO implements EngineInterface
      */
     public function read()
     {
-        if (!\is_resource($this->stream)) {
+        if (!is_resource($this->stream)) {
             return;
         }
 
-        $this->keepAlive();
         /*
          * The first byte contains the FIN bit, the reserved bits, and the
          * opcode... We're not interested in them. Yet.
          * the second byte contains the mask bit and the payload's length
          */
-        $data = $this->readBytes(2);
-        $bytes = \unpack('C*', $data);
-
-        if (empty($bytes[2])) {
-            return;
-        }
+        $data = fread($this->stream, 2);
+        $bytes = unpack('C*', $data);
 
         $mask = ($bytes[2] & 0b10000000) >> 7;
         $length = $bytes[2] & 0b01111111;
@@ -167,7 +143,7 @@ abstract class AbstractSocketIO implements EngineInterface
          * - if the length is 126, it means that it is coded over the next 2 bytes ;
          * - if the length is 127, it means that it is coded over the next 8 bytes.
          *
-         * But, here's the trick : we cannot interpret a length over 127 if the
+         * But,here's the trick : we cannot interpret a length over 127 if the
          * system does not support 64bits integers (such as Windows, or 32bits
          * processors architectures).
          */
@@ -176,8 +152,8 @@ abstract class AbstractSocketIO implements EngineInterface
                 break;
 
             case 0x7E: // 126
-                $data .= $bytes = $this->readBytes(2);
-                $bytes = \unpack('n', $bytes);
+                $data .= $bytes = fread($this->stream, 2);
+                $bytes = unpack('n', $bytes);
 
                 if (empty($bytes[1])) {
                     throw new RuntimeException('Invalid extended packet len');
@@ -198,18 +174,22 @@ abstract class AbstractSocketIO implements EngineInterface
                  *
                  * {@link http://stackoverflow.com/questions/14405751/pack-and-unpack-64-bit-integer}
                  */
-                $data .= $bytes = $this->readBytes(8);
-                list($left, $right) = \array_values(\unpack('N2', $bytes));
+                $data .= $bytes = fread($this->stream, 8);
+                list($left, $right) = array_values(unpack('N2', $bytes));
                 $length = $left << 32 | $right;
                 break;
         }
 
         // incorporate the mask key if the mask bit is 1
         if (true === $mask) {
-            $data .= $this->readBytes(4);
+            $data .= fread($this->stream, 4);
         }
 
-        $data .= $this->readBytes($length);
+        // Split the packet in case of the length > 16kb
+        while ($length > 0 && $buffer = fread($this->stream, $length)) {
+            $data   .= $buffer;
+            $length -= strlen($buffer);
+        }
 
         // decode the payload
         return (string) new Decoder($data);
@@ -230,13 +210,13 @@ abstract class AbstractSocketIO implements EngineInterface
      */
     protected function parseUrl($url)
     {
-        $parsed = \parse_url($url);
+        $parsed = parse_url($url);
 
         if (false === $parsed) {
             throw new MalformedUrlException($url);
         }
 
-        $server = \array_replace([
+        $server = array_replace([
             'scheme' => 'http',
             'host'   => 'localhost',
             'query'  => []
@@ -250,8 +230,8 @@ abstract class AbstractSocketIO implements EngineInterface
             $server['path'] = 'socket.io';
         }
 
-        if (!\is_array($server['query'])) {
-            \parse_str($server['query'], $query);
+        if (!is_array($server['query'])) {
+            parse_str($server['query'], $query);
             $server['query'] = $query;
         }
 
@@ -269,97 +249,8 @@ abstract class AbstractSocketIO implements EngineInterface
     {
         return [
             'debug' => false,
-            'wait' => 0,
-            'timeout' => \ini_get("default_socket_timeout")
+            'wait' => 100 * 1000,
+            'timeout' => ini_get("default_socket_timeout")
         ];
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * Be careful, this method may hang your script, as we're not in a non
-     * blocking mode.
-     */
-    public function readWhile()
-    {
-        $messages = [];
-        while (true) {
-            if (!\is_resource($this->stream)) {
-                break;
-            }
-
-            $this->keepAlive();
-            /*
-         * The first byte contains the FIN bit, the reserved bits, and the
-         * opcode... We're not interested in them. Yet.
-         * the second byte contains the mask bit and the payload's length
-         */
-            $data = $this->readBytes(2);
-            $bytes = \unpack('C*', $data);
-
-            if (empty($bytes[2])) {
-                break;
-            }
-
-            $mask = ($bytes[2] & 0b10000000) >> 7;
-            $length = $bytes[2] & 0b01111111;
-
-            /*
-         * Here is where it is getting tricky :
-         *
-         * - If the length <= 125, then we do not need to do anything ;
-         * - if the length is 126, it means that it is coded over the next 2 bytes ;
-         * - if the length is 127, it means that it is coded over the next 8 bytes.
-         *
-         * But, here's the trick : we cannot interpret a length over 127 if the
-         * system does not support 64bits integers (such as Windows, or 32bits
-         * processors architectures).
-         */
-            switch ($length) {
-                case 0x7D: // 125
-                    break;
-
-                case 0x7E: // 126
-                    $data .= $bytes = $this->readBytes(2);
-                    $bytes = \unpack('n', $bytes);
-
-                    if (empty($bytes[1])) {
-                        throw new RuntimeException('Invalid extended packet len');
-                    }
-
-                    $length = $bytes[1];
-                    break;
-
-                case 0x7F: // 127
-                    // are (at least) 64 bits not supported by the architecture ?
-                    if (8 > PHP_INT_SIZE) {
-                        throw new DomainException('64 bits unsigned integer are not supported on this architecture');
-                    }
-
-                    /*
-                 * As (un)pack does not support unpacking 64bits unsigned
-                 * integer, we need to split the data
-                 *
-                 * {@link http://stackoverflow.com/questions/14405751/pack-and-unpack-64-bit-integer}
-                 */
-                    $data .= $bytes = $this->readBytes(8);
-                    list($left, $right) = \array_values(\unpack('N2', $bytes));
-                    $length = $left << 32 | $right;
-                    break;
-            }
-
-            // incorporate the mask key if the mask bit is 1
-            if (true === $mask) {
-                $data .= $this->readBytes(4);
-            }
-
-            $data .= $this->readBytes($length);
-
-            // decode the payload
-            $decoded_data = (new Decoder($data))->__toString();
-            $messages[] = $decoded_data;
-        }
-
-        return $messages;
     }
 }
