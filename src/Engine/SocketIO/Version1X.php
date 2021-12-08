@@ -1,4 +1,5 @@
 <?php
+
 /**
  * This file is part of the Elephant.io package
  *
@@ -95,7 +96,6 @@ class Version1X extends AbstractSocketIO
     /** {@inheritDoc} */
     public function emit($event, array $args)
     {
-        $this->keepAlive();
         $namespace = $this->namespace;
 
         if ('' !== $namespace) {
@@ -108,7 +108,6 @@ class Version1X extends AbstractSocketIO
     /** {@inheritDoc} */
     public function of($namespace)
     {
-        $this->keepAlive();
         parent::of($namespace);
 
         $this->write(EngineInterface::MESSAGE, static::CONNECT . $namespace);
@@ -127,10 +126,6 @@ class Version1X extends AbstractSocketIO
 
         $payload = new Encoder($code . $message, Encoder::OPCODE_TEXT, true);
         $bytes = @\fwrite($this->stream, (string) $payload);
-
-        if ($bytes === false){
-            throw new \Exception("Message was not delivered");
-        }
 
         // wait a little bit of time after this message was sent
         \usleep((int) $this->options['wait']);
@@ -163,9 +158,11 @@ class Version1X extends AbstractSocketIO
             return;
         }
 
-        $query = ['use_b64'   => $this->options['use_b64'],
-                  'EIO'       => $this->options['version'],
-                  'transport' => $this->options['transport']];
+        $query = [
+            'use_b64'   => $this->options['use_b64'],
+            'EIO'       => $this->options['version'],
+            'transport' => $this->options['transport']
+        ];
 
         if (isset($this->url['query'])) {
             $query = \array_replace($query, $this->url['query']);
@@ -207,7 +204,7 @@ class Version1X extends AbstractSocketIO
         }
 
         $open_curly_at = \strpos($result, '{');
-        $todecode = \substr($result, $open_curly_at, \strrpos($result, '}')-$open_curly_at+1);
+        $todecode = \substr($result, $open_curly_at, \strrpos($result, '}') - $open_curly_at + 1);
         $decoded = \json_decode($todecode, true);
 
         if (!\in_array('websocket', $decoded['upgrades'])) {
@@ -239,9 +236,11 @@ class Version1X extends AbstractSocketIO
      */
     protected function upgradeTransport()
     {
-        $query = ['sid'       => $this->session->id,
-                  'EIO'       => $this->options['version'],
-                  'transport' => static::TRANSPORT_WEBSOCKET];
+        $query = [
+            'sid'       => $this->session->id,
+            'EIO'       => $this->options['version'],
+            'transport' => static::TRANSPORT_WEBSOCKET
+        ];
 
         if ($this->options['version'] === 2) {
             $query['use_b64'] = $this->options['use_b64'];
@@ -258,7 +257,7 @@ class Version1X extends AbstractSocketIO
         $key = \base64_encode($hash);
 
         $origin = '*';
-        $headers = isset($this->context['headers']) ? (array) $this->context['headers'] : [] ;
+        $headers = isset($this->context['headers']) ? (array) $this->context['headers'] : [];
 
         foreach ($headers as $header) {
             $matches = [];
@@ -270,12 +269,12 @@ class Version1X extends AbstractSocketIO
         }
 
         $request = "GET {$url} HTTP/1.1\r\n"
-                 . "Host: {$this->url['host']}:{$this->url['port']}\r\n"
-                 . "Upgrade: WebSocket\r\n"
-                 . "Connection: Upgrade\r\n"
-                 . "Sec-WebSocket-Key: {$key}\r\n"
-                 . "Sec-WebSocket-Version: 13\r\n"
-                 . "Origin: {$origin}\r\n";
+            . "Host: {$this->url['host']}:{$this->url['port']}\r\n"
+            . "Upgrade: WebSocket\r\n"
+            . "Connection: Upgrade\r\n"
+            . "Sec-WebSocket-Key: {$key}\r\n"
+            . "Sec-WebSocket-Version: 13\r\n"
+            . "Origin: {$origin}\r\n";
 
         if (!empty($this->cookies)) {
             $request .= "Cookie: " . \implode('; ', $this->cookies) . "\r\n";
@@ -302,16 +301,6 @@ class Version1X extends AbstractSocketIO
             if (stream_get_meta_data($this->stream)["unread_bytes"] !== 0) {
                 $this->read();
             }
-        }
-    }
-
-    /**
-     * {@inheritDoc}
-     */
-    public function keepAlive()
-    {
-        if ($this->session->needsHeartbeat()) {
-            $this->write(static::PING);
         }
     }
 }
